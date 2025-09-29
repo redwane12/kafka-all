@@ -1,0 +1,15 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"
+
+[env]
+KAFKA_BROKER_ID = "1"
+KAFKA_ZOOKEEPER_CONNECT = "${{ZOOKEEPER_SERVICE_URL}}"
+KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR = "1"
+KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS = "0"
+KAFKA_AUTO_CREATE_TOPICS_ENABLE = "true"

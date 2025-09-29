@@ -1,0 +1,13 @@
+[build]
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/"
+healthcheckTimeout = 100
+restartPolicyType = "on_failure"
+
+[env]
+KAFKA_CLUSTERS_0_NAME = "railway-kafka"
+KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS = "${{KAFKA_SERVICE_URL}}"
+KAFKA_CLUSTERS_0_ZOOKEEPER = "${{ZOOKEEPER_SERVICE_URL}}"
