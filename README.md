@@ -258,3 +258,4 @@ Se encontrar problemas:
 
 **🎉 Parabéns! Você agora tem uma instância completa do Apache Kafka rodando!**
 "# kafka-all" 
+"# kafka-all" 
