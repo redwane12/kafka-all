@@ -67,8 +67,6 @@ configure_acls() {
 configure_acls &
 create_scram_users &
 
-# Aguardar Zookeeper
-wait_for_zookeeper
 
 # Criar configuração JAAS
 create_jaas_config
