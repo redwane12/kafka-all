@@ -27,7 +27,6 @@ configure_acls() {
 }
 
 # Aguardar Zookeeper
-wait_for_zookeeper
 
 # Executar funções em background (desabilitadas)
 configure_acls &
