@@ -1,94 +1,49 @@
 #!/bin/bash
 
 # =================================================================
-# Script de inicialização do Kafka com autenticação SASL/SCRAM
+# Script de inicialização SIMPLIFICADO do Kafka
 # =================================================================
 
 set -e
 
-# Função para aguardar o Zookeeper estar disponível
-wait_for_zookeeper() {
-    echo "Aguardando Zookeeper estar disponível..."
-    echo "Tentando conectar em: $KAFKA_ZOOKEEPER_CONNECT"
-    
-    local count=0
-    while [ $count -lt 30 ]; do
-        if nc -z ${KAFKA_ZOOKEEPER_CONNECT%:*} 2181 2>/dev/null; then
-            echo "Zookeeper está disponível!"
-            return 0
-        fi
-        echo "Tentativa $((count + 1))/30 - Zookeeper não está disponível - aguardando..."
-        sleep 2
-        count=$((count + 1))
-    done
-    
-    echo "Zookeeper não ficou disponível após 60 segundos, continuando mesmo assim..."
-}
+# **CRÍTICO: Desabilitar SASL para ZooKeeper Client**
+export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf -Dzookeeper.sasl.client=false"
 
-# Função para criar arquivo JAAS (apenas para Kafka)
-create_jaas_config() {
-    echo "Criando configuração JAAS apenas para Kafka..."
-    
-    cat > /etc/kafka/secrets/kafka_server_jaas.conf << 'JAAS_EOF'
+# Criar configuração JAAS apenas para Kafka
+echo "Criando configuração JAAS apenas para Kafka..."
+mkdir -p /etc/kafka/secrets
+
+cat > /etc/kafka/secrets/kafka_server_jaas.conf << 'JAAS_EOF'
 KafkaServer {
     org.apache.kafka.common.security.scram.ScramLoginModule required
     username="admin"
     password="admin-secret";
 };
 JAAS_EOF
-    
-    echo "Arquivo JAAS criado com sucesso!"
-}
 
-# Função para criar usuários SCRAM
-create_scram_users() {
-    echo "Criando usuários SCRAM..."
+echo "Arquivo JAAS criado com sucesso!"
+
+# Função para configuração pós-inicialização
+setup_after_start() {
+    echo "Aguardando Kafka iniciar (30 segundos)..."
+    sleep 30
     
-    # Aguardar o Kafka estar rodando
-    sleep 15
-    
-    # Criar usuário com API_KEY e API_SECRET
+    # Tentar criar usuário SCRAM
     if [ ! -z "$API_KEY" ] && [ ! -z "$API_SECRET" ]; then
-        echo "Criando usuário SCRAM: $API_KEY"
-        kafka-configs --zookeeper $KAFKA_ZOOKEEPER_CONNECT \
+        echo "Tentando criar usuário SCRAM: $API_KEY"
+        
+        # Método 1: Via Zookeeper (mais confiável no início)
+        kafka-configs --zookeeper "$KAFKA_ZOOKEEPER_CONNECT" \
             --alter \
-            --add-config 'SCRAM-SHA-256=[password='$API_SECRET'],SCRAM-SHA-512=[password='$API_SECRET']' \
+            --add-config "SCRAM-SHA-256=[password=$API_SECRET],SCRAM-SHA-512=[password=$API_SECRET]" \
             --entity-type users \
-            --entity-name $API_KEY || echo "Usuário já existe ou erro na criação"
+            --entity-name "$API_KEY" || echo "Usuário já existe ou erro na criação"
     fi
 }
 
-# Função para configurar ACLs
-configure_acls() {
-    echo "Configurando ACLs..."
-    
-    # Aguardar o Kafka estar rodando
-    sleep 20
-    
-    if [ ! -z "$API_KEY" ]; then
-        # Dar permissões para o usuário da API usando a porta interna
-        kafka-acls --bootstrap-server localhost:29092 \
-            --add \
-            --allow-principal User:$API_KEY \
-            --operation All \
-            --topic '*' \
-            --group '*' || echo "Erro ao configurar ACLs"
-    fi
-}
-
-# Aguardar Zookeeper
-wait_for_zookeeper
-
-# Criar configuração JAAS
-create_jaas_config
-
-# Executar funções em background
-configure_acls &
-create_scram_users &
-
-# **CRÍTICO: Desabilitar SASL para ZooKeeper Client**
-export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf -Dzookeeper.sasl.client=false -Dzookeeper.sasl.clientconfig=null"
+# Executar setup em background
+setup_after_start &
 
 # Iniciar o Kafka
-echo "Iniciando Kafka com autenticação SASL/SCRAM..."
+echo "Iniciando Kafka..."
 exec /etc/confluent/docker/run
