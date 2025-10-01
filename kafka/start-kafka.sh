@@ -7,14 +7,6 @@
 set -e
 
 # Função para aguardar o Zookeeper estar disponível
-wait_for_zookeeper() {
-    echo "Aguardando Zookeeper estar disponível..."
-    until nc -z $KAFKA_ZOOKEEPER_CONNECT; do
-        echo "Zookeeper não está disponível - aguardando..."
-        sleep 2
-    done
-    echo "Zookeeper está disponível!"
-}
 
 # Função para criar usuários SCRAM
 create_scram_users() {
