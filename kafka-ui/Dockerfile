@@ -1,12 +1,14 @@
-FROM provectuslabs/kafka-ui:latest
+# =================================================================
+# Dockerfile para Kafbat (antigo Kafka UI)
+# =================================================================
 
-# Configurações específicas para Railway
-ENV KAFKA_CLUSTERS_0_NAME=${KAFKA_CLUSTERS_0_NAME:-railway-kafka}
-ENV KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=${KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS:-kafka:9092}
-ENV KAFKA_CLUSTERS_0_ZOOKEEPER=${KAFKA_CLUSTERS_0_ZOOKEEPER:-zookeeper:2181}
+# Define a imagem oficial do Kafbat como base. Usar a tag :latest
+# garante que você está pegando a versão mais recente.
+FROM ghcr.io/kafbat/kafka-ui:latest
 
-# Expor porta padrão
+# Expõe a porta 8080, que é a porta padrão da aplicação web.
+# Isso serve como documentação e ajuda na configuração de redes.
 EXPOSE 8080
 
-# Railway usa PORT como variável de ambiente
-CMD ["sh", "-c", "export SERVER_PORT=${PORT:-8080} && java $JAVA_OPTS -jar kafka-ui-api.jar"]
+# A imagem base já contém o comando (CMD) necessário para iniciar
+# a aplicação, então você não precisa adicionar um aqui.
