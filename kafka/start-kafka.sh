@@ -36,12 +36,6 @@ KafkaServer {
     username="admin"
     password="admin-secret";
 };
-
-Client {
-    org.apache.kafka.common.security.scram.ScramLoginModule required
-    username="admin"
-    password="admin-secret";
-};
 JAAS_EOF
 }
 
@@ -53,8 +47,8 @@ configure_acls() {
     sleep 15
     
     if [ ! -z "$API_KEY" ]; then
-        # Dar permissões para o usuário da API
-        kafka-acls --bootstrap-server localhost:9092 \
+        # Dar permissões para o usuário da API usando a porta interna
+        kafka-acls --bootstrap-server localhost:29092 \
             --add \
             --allow-principal User:$API_KEY \
             --operation All \
