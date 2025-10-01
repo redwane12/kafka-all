@@ -1,16 +1,16 @@
 #!/bin/bash
 
 # =================================================================
-# Script de inicialização SIMPLIFICADO do Kafka
+# Script FINAL para Kafka - Foco: Usuário externo com SASL/SCRAM
 # =================================================================
 
 set -e
 
-# **CRÍTICO: Desabilitar SASL para ZooKeeper Client**
+# Desabilitar SASL para ZooKeeper Client
 export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf -Dzookeeper.sasl.client=false"
 
 # Criar configuração JAAS apenas para Kafka
-echo "Criando configuração JAAS apenas para Kafka..."
+echo "Criando configuração JAAS para Kafka..."
 mkdir -p /etc/kafka/secrets
 
 cat > /etc/kafka/secrets/kafka_server_jaas.conf << 'JAAS_EOF'
@@ -21,29 +21,31 @@ KafkaServer {
 };
 JAAS_EOF
 
-echo "Arquivo JAAS criado com sucesso!"
+echo "✅ Arquivo JAAS criado"
 
-# Função para configuração pós-inicialização
-setup_after_start() {
-    echo "Aguardando Kafka iniciar (30 segundos)..."
-    sleep 30
+# Tentar criar usuário SCRAM apenas se Zookeeper estiver disponível rapidamente
+if [ ! -z "$API_KEY" ] && [ ! -z "$API_SECRET" ]; then
+    echo "Tentando criar usuário SCRAM: $API_KEY"
     
-    # Tentar criar usuário SCRAM
-    if [ ! -z "$API_KEY" ] && [ ! -z "$API_SECRET" ]; then
-        echo "Tentando criar usuário SCRAM: $API_KEY"
-        
-        # Método 1: Via Zookeeper (mais confiável no início)
+    # Tentativa rápida - se não conseguir em 10s, pula
+    if timeout 10s bash -c "until nc -z ${KAFKA_ZOOKEEPER_CONNECT%:*} 2181; do sleep 1; done"; then
+        echo "✅ Zookeeper disponível, criando usuário..."
         kafka-configs --zookeeper "$KAFKA_ZOOKEEPER_CONNECT" \
             --alter \
             --add-config "SCRAM-SHA-256=[password=$API_SECRET],SCRAM-SHA-512=[password=$API_SECRET]" \
             --entity-type users \
-            --entity-name "$API_KEY" || echo "Usuário já existe ou erro na criação"
+            --entity-name "$API_KEY"
+        echo "✅ Usuário SCRAM criado: $API_KEY"
+    else
+        echo "⚠️  Zookeeper não disponível rapidamente, usuário será criado manualmente depois"
+        echo "⚠️  Execute manualmente depois:"
+        echo "kafka-configs --bootstrap-server localhost:29092 --alter --add-config 'SCRAM-SHA-256=[password=$API_SECRET]' --entity-type users --entity-name $API_KEY"
     fi
-}
+fi
 
-# Executar setup em background
-setup_after_start &
+echo "🚀 Iniciando Kafka Broker..."
+echo "📝 Configure ACLs manualmente depois com:"
+echo "kafka-acls --bootstrap-server localhost:29092 --add --allow-principal User:$API_KEY --operation All --topic '*' --group '*' --force"
 
 # Iniciar o Kafka
-echo "Iniciando Kafka..."
 exec /etc/confluent/docker/run
