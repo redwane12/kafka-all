@@ -8,61 +8,32 @@ set -e
 
 # Função para aguardar o Zookeeper estar disponível
 
-# Função para criar usuários SCRAM
+# Função para criar usuários SCRAM (desabilitada por enquanto)
 create_scram_users() {
-    echo "Criando usuários SCRAM..."
-    
-    # Aguardar o Kafka estar rodando
-    sleep 10
-    
-    # Criar usuário com API_KEY e API_SECRET
-    if [ ! -z "$API_KEY" ] && [ ! -z "$API_SECRET" ]; then
-        echo "Criando usuário SCRAM: $API_KEY"
-        kafka-configs --zookeeper $KAFKA_ZOOKEEPER_CONNECT \
-            --alter \
-            --add-config 'SCRAM-SHA-256=[password='$API_SECRET'],SCRAM-SHA-512=[password='$API_SECRET']' \
-            --entity-type users \
-            --entity-name $API_KEY || echo "Usuário já existe ou erro na criação"
-    fi
+    echo "Criação de usuários SCRAM desabilitada para simplificar configuração..."
+    # Usuários SCRAM serão configurados manualmente se necessário
 }
 
-# Função para criar arquivo JAAS
+# Função para criar arquivo JAAS (desabilitada por enquanto)
 create_jaas_config() {
-    echo "Criando configuração JAAS..."
-    
-    cat > /etc/kafka/secrets/kafka_server_jaas.conf << 'JAAS_EOF'
-KafkaServer {
-    org.apache.kafka.common.security.scram.ScramLoginModule required
-    username="admin"
-    password="admin-secret";
-};
-JAAS_EOF
+    echo "Configuração JAAS desabilitada para evitar conflitos com Zookeeper..."
+    # Arquivo JAAS não será criado para evitar problemas de SASL com Zookeeper
 }
 
-# Função para configurar ACLs
+# Função para configurar ACLs (desabilitada por enquanto)
 configure_acls() {
-    echo "Configurando ACLs..."
-    
-    # Aguardar o Kafka estar rodando
-    sleep 15
-    
-    if [ ! -z "$API_KEY" ]; then
-        # Dar permissões para o usuário da API usando a porta interna
-        kafka-acls --bootstrap-server localhost:29092 \
-            --add \
-            --allow-principal User:$API_KEY \
-            --operation All \
-            --topic '*' \
-            --group '*' || echo "Erro ao configurar ACLs"
-    fi
+    echo "Configuração de ACLs desabilitada para simplificar configuração..."
+    # ACLs serão configuradas manualmente se necessário
 }
 
-# Executar funções em background
+# Aguardar Zookeeper
+wait_for_zookeeper
+
+# Executar funções em background (desabilitadas)
 configure_acls &
 create_scram_users &
 
-
-# Criar configuração JAAS
+# Criar configuração JAAS (desabilitada)
 create_jaas_config
 
 # Iniciar o Kafka
