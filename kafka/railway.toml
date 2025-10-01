@@ -10,9 +10,14 @@ KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS="0"
 KAFKA_AUTO_CREATE_TOPICS_ENABLE="true"
 
 
-# Configurações de autenticação SASL/SCRAM apenas para clientes externos
+# Configurações de autenticação SASL/SCRAM para clientes externos
 KAFKA_SASL_ENABLED_MECHANISMS="SCRAM-SHA-256,SCRAM-SHA-512"
 KAFKA_SASL_MECHANISM_INTER_BROKER_PROTOCOL="PLAINTEXT"
+KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf"
+
+# Configurações de autorização
+KAFKA_AUTHORIZER_CLASS_NAME="kafka.security.auth.SimpleAclAuthorizer"
+KAFKA_SUPER_USERS="User:admin"
 
 API_KEY="12345678"
 API_SECRET="12345678"
