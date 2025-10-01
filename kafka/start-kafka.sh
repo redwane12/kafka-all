@@ -36,6 +36,11 @@ KafkaServer {
     username="admin"
     password="admin-secret";
 };
+KafkaClient {
+    org.apache.kafka.common.security.scram.ScramLoginModule required
+    username="admin"
+    password="admin-secret";
+};
 JAAS_EOF
     
     echo "Arquivo JAAS criado com sucesso!"
