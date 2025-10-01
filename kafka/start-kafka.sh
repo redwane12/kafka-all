@@ -11,7 +11,6 @@ wait_for_zookeeper() {
     echo "Aguardando Zookeeper estar disponível..."
     echo "Tentando conectar em: $KAFKA_ZOOKEEPER_CONNECT"
     
-    # Tentar conectar por 60 segundos
     local count=0
     while [ $count -lt 30 ]; do
         if nc -z ${KAFKA_ZOOKEEPER_CONNECT%:*} 2181 2>/dev/null; then
@@ -26,17 +25,12 @@ wait_for_zookeeper() {
     echo "Zookeeper não ficou disponível após 60 segundos, continuando mesmo assim..."
 }
 
-# Função para criar arquivo JAAS (apenas para Kafka, não para Zookeeper)
+# Função para criar arquivo JAAS (apenas para Kafka)
 create_jaas_config() {
-    echo "Criando configuração JAAS para Kafka..."
+    echo "Criando configuração JAAS apenas para Kafka..."
     
     cat > /etc/kafka/secrets/kafka_server_jaas.conf << 'JAAS_EOF'
 KafkaServer {
-    org.apache.kafka.common.security.scram.ScramLoginModule required
-    username="admin"
-    password="admin-secret";
-};
-KafkaClient {
     org.apache.kafka.common.security.scram.ScramLoginModule required
     username="admin"
     password="admin-secret";
@@ -91,6 +85,9 @@ create_jaas_config
 # Executar funções em background
 configure_acls &
 create_scram_users &
+
+# Exportar variável apenas para o processo Kafka
+export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf"
 
 # Iniciar o Kafka
 echo "Iniciando Kafka com autenticação SASL/SCRAM..."
