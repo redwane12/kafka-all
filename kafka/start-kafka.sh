@@ -86,8 +86,8 @@ create_jaas_config
 configure_acls &
 create_scram_users &
 
-# Exportar variável apenas para o processo Kafka
-export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf"
+# **CRÍTICO: Desabilitar SASL para ZooKeeper Client**
+export KAFKA_OPTS="-Djava.security.auth.login.config=/etc/kafka/secrets/kafka_server_jaas.conf -Dzookeeper.sasl.client=false -Dzookeeper.sasl.clientconfig=null"
 
 # Iniciar o Kafka
 echo "Iniciando Kafka com autenticação SASL/SCRAM..."
