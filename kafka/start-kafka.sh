@@ -38,7 +38,7 @@ create_scram_users() {
 create_jaas_config() {
     echo "Criando configuração JAAS..."
     
-    cat > /etc/kafka/secrets/kafka_server_jaas.conf << EOF
+    cat > /etc/kafka/secrets/kafka_server_jaas.conf << 'JAAS_EOF'
 KafkaServer {
     org.apache.kafka.common.security.scram.ScramLoginModule required
     username="admin"
@@ -50,7 +50,7 @@ Client {
     username="admin"
     password="admin-secret";
 };
-EOF
+JAAS_EOF
 }
 
 # Função para configurar ACLs

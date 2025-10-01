@@ -9,7 +9,6 @@ RUN mkdir -p /etc/kafka/secrets
 
 # Copiar script de inicialização
 COPY start-kafka.sh /start-kafka.sh
-RUN chmod +x /start-kafka.sh
 
 # Expõe as portas:
 # 9092: Para comunicação interna (PLAINTEXT)
@@ -17,5 +16,5 @@ RUN chmod +x /start-kafka.sh
 # 9093: Para comunicação com autenticação SASL/SCRAM
 EXPOSE 9092 29092 9093
 
-# Usar script de inicialização personalizado
-CMD ["/start-kafka.sh"]
+# Usar script de inicialização personalizado (executado com bash)
+CMD ["bash", "/start-kafka.sh"]
