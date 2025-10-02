@@ -1,5 +1,7 @@
-# Substitua pela imagem base que você está usando, se for diferente
-FROM bitnami/kafka:latest
+FROM confluentinc/cp-kafka:7.6.1
+
+# Use subdirectory específico para dados do Kafka dentro do volume
+ENV KAFKA_LOG_DIRS=/var/lib/kafka/data/kafka-storage
 
 # Mude para o utilizador root temporariamente para poder alterar as permissões
 USER root
