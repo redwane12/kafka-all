@@ -12,5 +12,3 @@ EXPOSE 9092 29092
 # Cria diretório para dados do Kafka
 RUN mkdir -p /var/lib/kafka/data
 
-# Define o volume para persistência de dados
-VOLUME ["/var/lib/kafka/data"]
