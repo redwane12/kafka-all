@@ -1,9 +1,6 @@
 FROM confluentinc/cp-kafka:7.6.1
 
-# Copy custom startup script
-COPY --chmod=755 kafka-startup.sh /usr/local/bin/kafka-startup.sh
+# Use subdirectory específico para dados do Kafka dentro do volume
+ENV KAFKA_LOG_DIRS=/var/lib/kafka/data/kafka-storage
 
-# Set environment variable for Kafka logs directory
-ENV KAFKA_LOG_DIRS=/var/lib/kafka/data/kafka-logs
-
-ENTRYPOINT ["/usr/local/bin/kafka-startup.sh"]
+# Não precisamos de scripts customizados, o Railway cuida das permissões
