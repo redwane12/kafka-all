@@ -1,261 +1,130 @@
-# 🚀 Apache Kafka - Guia Completo de Instalação e Uso
+Com certeza\! Baseado em toda a nossa jornada de troubleshooting, preparei um `README.md` completo.
 
-Este repositório contém uma configuração completa do Apache Kafka usando Docker, incluindo scripts de gerenciamento e exemplos de código.
+Este guia é o resultado final de tudo o que aprendemos e representa a forma correta e robusta de configurar um broker Kafka moderno (modo KRaft) e o Kafka UI na plataforma Railway.
 
-## 📋 Pré-requisitos
+Pode copiar e colar o conteúdo abaixo diretamente num ficheiro `README.md` no seu repositório do GitHub.
 
-- **Docker Desktop** instalado e rodando
-- **Python 3.7+** (para os exemplos de código)
-- **Windows 10/11** (scripts otimizados para Windows)
+-----
 
-## 🏗️ Arquitetura da Configuração
+# Configurando um Broker Kafka (KRaft) e Kafka UI no Railway
 
-A configuração inclui:
-- **Zookeeper**: Gerenciamento de metadados do Kafka
-- **Kafka Broker**: Servidor principal do Kafka
-- **Kafka UI**: Interface web para gerenciamento (opcional)
+Este guia detalha o processo passo a passo para fazer o deploy de um broker Kafka moderno, em modo KRaft (sem Zookeeper), na plataforma Railway. Inclui também a configuração de um serviço [Kafka UI](https://github.com/provectus/kafka-ui) para gerir e visualizar o seu cluster Kafka.
 
-## 🚀 Como Iniciar o Kafka
+## O Que Vamos Configurar?
 
-### Método 1: Script Automatizado (Recomendado)
+1.  **Serviço Kafka**: Um único nó Kafka a correr como broker e controller (modo KRaft).
+2.  **Volume Persistente**: Para garantir que os dados do Kafka não se perdem entre deploys.
+3.  **Serviço Kafka UI**: Uma interface web para interagir com o nosso broker Kafka.
+
+-----
+
+## 1\. Configurando o Serviço Kafka
+
+Esta é a parte principal, onde configuramos o broker Kafka.
+
+### \#\#\# Passo 1: Criar o `Dockerfile`
+
+Na raiz do seu projeto, crie um ficheiro chamado `Dockerfile` com o seguinte conteúdo. Este ficheiro é responsável por preparar o ambiente e garantir que as permissões do volume são corrigidas antes de iniciar o Kafka.
+
+```dockerfile
+# 1. Usar a imagem oficial da Confluent
+FROM confluentinc/cp-kafka:8.0.1
+
+# 2. Definir o utilizador como root.
+#    Isto é essencial para que o comando de arranque (CMD)
+#    possa corrigir as permissões do volume montado pelo Railway.
+USER root
+
+# 3. Definir o comando de arranque.
+#    - 'chown' corrige a propriedade do diretório de dados para o utilizador 1000 (appuser).
+#    - '/etc/confluent/docker/run' é o script oficial que lê as variáveis de ambiente
+#      e inicia o Kafka corretamente, baixando os privilégios internamente.
+CMD ["bash", "-c", "chown -R 1000:1000 /var/lib/kafka/data && /etc/confluent/docker/run"]
+```
+
+### \#\#\# Passo 2: Criar e Configurar o Serviço no Railway
+
+1.  **Crie o Serviço**: No seu dashboard do Railway, crie um novo serviço a partir do seu repositório do GitHub.
+2.  **Adicione um Volume Persistente**:
+      * Com o serviço selecionado, vá para a aba **"Volumes"**.
+      * Clique em **"Add Volume"**.
+      * Configure o "Mount Path" para `/var/lib/kafka/data`.
+
+### \#\#\# Passo 3: Gerar o `CLUSTER_ID`
+
+O modo KRaft requer um ID de cluster único. Execute o seguinte comando no seu terminal (precisa do Docker instalado) para gerar um:
+
 ```bash
-# Execute o script de inicialização
-start-kafka.bat
+docker run --rm confluentinc/cp-kafka:latest kafka-storage.sh random-uuid
 ```
 
-### Método 2: Docker Compose Manual
-```bash
-# Inicie os containers
-docker-compose up -d
+Copie o ID gerado (ex: `MkU3OEVBNTcwNTJENDM2Qk`). Vai precisar dele no próximo passo.
 
-# Verifique se os containers estão rodando
-docker-compose ps
-```
+### \#\#\# Passo 4: Configurar as Variáveis de Ambiente
 
-## 🛑 Como Parar o Kafka
+Vá para a aba **"Variables"** do seu serviço Kafka e adicione as seguintes variáveis. Esta é a configuração definitiva e correta para o modo KRaft.
 
-```bash
-# Execute o script de parada
-stop-kafka.bat
+| Nome da Variável                                  | Valor                                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------------- |
+| **`KAFKA_PROCESS_ROLES`** | `broker,controller`                                                       |
+| **`KAFKA_NODE_ID`** | `1`                                                                       |
+| **`KAFKA_CONTROLLER_QUORUM_VOTERS`** | `1@localhost:9093`                                                        |
+| **`KAFKA_LISTENERS`** | `PLAINTEXT://:9092,CONTROLLER://:9093`                                    |
+| **`KAFKA_ADVERTISED_LISTENERS`** | `PLAINTEXT://your-service-name.up.railway.app:9092`                     |
+| **`KAFKA_LISTENER_SECURITY_PROTOCOL_MAP`** | `PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT`                                |
+| **`KAFKA_INTER_BROKER_LISTENER_NAME`** | `PLAINTEXT`                                                               |
+| **`KAFKA_CONTROLLER_LISTENER_NAMES`** | `CONTROLLER`                                                              |
+| **`KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR`** | `1`                                                                       |
+| **`KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR`** | `1`                                                                 |
+| **`CLUSTER_ID`** | **\<Cole aqui o seu ID gerado no Passo 3\>** |
+| **`KAFKA_LOG_DIRS`** | `/var/lib/kafka/data/kafka-logs`                                          |
 
-# Ou manualmente
-docker-compose down
-```
+> **‼️ MUITO IMPORTANTE: Atualize o `KAFKA_ADVERTISED_LISTENERS`**
+>
+> Vá à aba **"Settings"** do seu serviço Kafka. Na secção "Networking", copie a sua **URL Pública** e use-a para substituir `your-service-name.up.railway.app`.
 
-## 🌐 Acessos Disponíveis
+### \#\#\# Passo 5: Configurar o Deploy Final
 
-Após iniciar o Kafka, você terá acesso a:
+1.  Vá para a aba **"Settings" -\> "Build"**.
+2.  Certifique-se que o "Build Method" está definido como **Dockerfile**.
+3.  Vá para a aba **"Settings" -\> "Deploy"**.
+4.  Certifique-se que os campos **"Start Command"** e **"User"** estão **VAZIOS**.
+5.  O seu serviço irá fazer o deploy automaticamente. Verifique os logs para garantir que arranca sem erros.
 
-| Serviço | Endereço | Descrição |
-|---------|----------|-----------|
-| Kafka Broker | `localhost:9092` | Endpoint principal do Kafka |
-| Zookeeper | `localhost:2181` | Coordenação de cluster |
-| Kafka UI | `http://localhost:8080` | Interface web de gerenciamento |
+-----
 
-## 🛠️ Ferramentas de Gerenciamento
+## 2\. Configurando o Kafka UI
 
-### Script Interativo
-Execute `kafka-tools.bat` para acessar um menu interativo com opções para:
-1. ✅ Criar tópicos
-2. 📋 Listar tópicos
-3. 🗑️ Deletar tópicos
-4. 📤 Enviar mensagens (Producer)
-5. 📥 Consumir mensagens (Consumer)
+Com o Kafka a funcionar, vamos adicionar uma interface web para o gerir.
 
-### Comandos Manuais
+### \#\#\# Passo 1: Criar um Novo Serviço para o Kafka UI
 
-#### Criar um Tópico
-```bash
-docker exec kafka kafka-topics --create --topic meu-topico --bootstrap-server localhost:9092 --partitions 3 --replication-factor 1
-```
+1.  No seu projeto Railway, clique em **"New" -\> "Service"**.
+2.  Selecione a opção **"Deploy from Image"**.
+3.  Use a seguinte imagem Docker: `provectus/kafka-ui:latest`.
+4.  O Railway irá criar um novo serviço e expor uma porta pública para ele.
 
-#### Listar Tópicos
-```bash
-docker exec kafka kafka-topics --list --bootstrap-server localhost:9092
-```
+### \#\#\# Passo 2: Configurar as Variáveis de Ambiente do Kafka UI
 
-#### Enviar Mensagens (Producer Console)
-```bash
-docker exec -it kafka kafka-console-producer --topic meu-topico --bootstrap-server localhost:9092
-```
+Selecione o seu novo serviço Kafka UI e vá para a aba **"Variables"**. Adicione as seguintes variáveis para o conectar ao seu broker Kafka:
 
-#### Consumir Mensagens (Consumer Console)
-```bash
-docker exec -it kafka kafka-console-consumer --topic meu-topico --bootstrap-server localhost:9092 --from-beginning
-```
+| Nome da Variável                      | Valor                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------- |
+| **`KAFKA_CLUSTERS_0_NAME`** | `Railway Kafka` (ou qualquer nome que preferir)                    |
+| **`KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS`** | `your-service-name.up.railway.app:9092`                                |
+| **`DYNAMIC_CONFIG_ENABLED`** | `true` (Permite alterar configurações pela UI) |
 
-## 🐍 Exemplos em Python
+> **‼️ MUITO IMPORTANTE: `BOOTSTRAPSERVERS`**
+>
+> O valor para `KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS` é **exatamente a parte do host e porta** que você configurou em `KAFKA_ADVERTISED_LISTENERS` no seu serviço Kafka.
 
-### Instalação das Dependências
-```bash
-cd exemplos
-pip install -r requirements.txt
-```
+### \#\#\# Passo 3: Aceder à Interface
 
-### Producer (Enviar Mensagens)
-```bash
-python producer.py
-```
+Após o deploy do serviço Kafka UI, aceda à sua URL pública. Deverá ver o seu cluster "Railway Kafka" e poderá começar a criar tópicos, enviar mensagens e gerir o seu broker.
 
-O producer inclui:
-- ✉️ Envio de mensagens simples
-- 🔄 Geração automática de mensagens de teste
-- 💬 Modo interativo para envio manual
+-----
 
-### Consumer (Receber Mensagens)
-```bash
-python consumer.py
-```
+## Troubleshooting
 
-O consumer inclui:
-- 🎧 Consumo contínuo de mensagens
-- 📊 Processamento detalhado com metadados
-- 🔍 Informações sobre partições e offsets
-
-## 📚 Conceitos Importantes do Kafka
-
-### 🏷️ Tópicos (Topics)
-- Categorias onde as mensagens são organizadas
-- Exemplo: `vendas`, `logs`, `eventos-usuario`
-
-### 📦 Partições (Partitions)
-- Divisões de um tópico para escalabilidade
-- Permitem processamento paralelo
-
-### 👥 Grupos de Consumidores (Consumer Groups)
-- Conjunto de consumidores que trabalham juntos
-- Cada mensagem é processada por apenas um consumidor do grupo
-
-### 🔑 Chaves (Keys)
-- Identificador opcional para garantir ordem
-- Mensagens com a mesma chave vão para a mesma partição
-
-## ⚙️ Configurações Importantes
-
-### Configurações do Producer
-```python
-producer = KafkaProducer(
-    bootstrap_servers=['localhost:9092'],
-    value_serializer=lambda x: json.dumps(x).encode('utf-8'),
-    key_serializer=lambda x: x.encode('utf-8'),
-    acks='all',  # Aguarda confirmação de todas as réplicas
-    retries=3,   # Tentativas em caso de falha
-    batch_size=16384,  # Tamanho do lote para otimização
-)
-```
-
-### Configurações do Consumer
-```python
-consumer = KafkaConsumer(
-    'meu-topico',
-    bootstrap_servers=['localhost:9092'],
-    group_id='meu-grupo',
-    auto_offset_reset='earliest',  # Lê desde o início
-    enable_auto_commit=True,       # Confirma automaticamente
-    value_deserializer=lambda m: json.loads(m.decode('utf-8'))
-)
-```
-
-## 🔧 Troubleshooting
-
-### Problema: Containers não iniciam
-```bash
-# Verifique se as portas estão livres
-netstat -an | findstr :9092
-netstat -an | findstr :2181
-
-# Remova containers antigos
-docker-compose down -v
-docker system prune -f
-```
-
-### Problema: Não consegue conectar no Kafka
-1. ✅ Verifique se o Docker está rodando
-2. ✅ Confirme que os containers estão UP: `docker-compose ps`
-3. ✅ Teste a conectividade: `telnet localhost 9092`
-
-### Problema: Mensagens não aparecem
-1. ✅ Verifique se o tópico existe
-2. ✅ Confirme o nome do tópico no producer e consumer
-3. ✅ Use `--from-beginning` no consumer para ver mensagens antigas
-
-## 📈 Monitoramento
-
-### Kafka UI (Interface Web)
-Acesse `http://localhost:8080` para:
-- 📊 Visualizar tópicos e partições
-- 📈 Monitorar throughput e lag
-- 🔍 Inspecionar mensagens
-- ⚙️ Gerenciar configurações
-
-### Comandos de Monitoramento
-```bash
-# Informações do cluster
-docker exec kafka kafka-broker-api-versions --bootstrap-server localhost:9092
-
-# Status dos consumer groups
-docker exec kafka kafka-consumer-groups --bootstrap-server localhost:9092 --list
-
-# Detalhes de um consumer group
-docker exec kafka kafka-consumer-groups --bootstrap-server localhost:9092 --group meu-grupo --describe
-```
-
-## 🎯 Casos de Uso Comuns
-
-### 1. 📊 Streaming de Eventos
-```python
-# Producer para eventos de usuário
-evento = {
-    "usuario_id": 12345,
-    "acao": "compra",
-    "produto": "smartphone",
-    "valor": 899.99,
-    "timestamp": datetime.now().isoformat()
-}
-producer.send('eventos-usuario', value=evento)
-```
-
-### 2. 📝 Processamento de Logs
-```python
-# Consumer para processar logs
-for mensagem in consumer:
-    log_entry = mensagem.value
-    if log_entry['level'] == 'ERROR':
-        enviar_alerta(log_entry)
-    salvar_no_banco(log_entry)
-```
-
-### 3. 🔄 Integração de Microserviços
-```python
-# Serviço A envia evento
-evento_pedido = {
-    "pedido_id": "PED-001",
-    "status": "confirmado",
-    "cliente_id": 456
-}
-producer.send('pedidos', value=evento_pedido)
-
-# Serviço B processa evento
-# (estoque, pagamento, entrega, etc.)
-```
-
-## 🚀 Próximos Passos
-
-1. 📖 Estude a [documentação oficial do Kafka](https://kafka.apache.org/documentation/)
-2. 🧪 Experimente com diferentes configurações de partições
-3. 🔧 Implemente processamento de stream com Kafka Streams
-4. 📊 Configure monitoramento com Prometheus + Grafana
-5. 🔒 Adicione segurança (SSL/SASL)
-
-## 📞 Suporte
-
-Se encontrar problemas:
-1. 🔍 Verifique os logs: `docker-compose logs kafka`
-2. 📖 Consulte este README
-3. 🌐 Acesse a documentação oficial do Apache Kafka
-
----
-
-**🎉 Parabéns! Você agora tem uma instância completa do Apache Kafka rodando!**
-"# kafka-all" 
-"# kafka-all" 
+  * **Erros sobre dados antigos (`Unable to read broker epoch`):** Se alguma vez precisar de recomeçar do zero, vá à aba **"Volumes"** do seu serviço Kafka, clique no menu do volume e selecione **"Clear Volume"**. Isto irá apagar todos os dados e permitir um arranque limpo.
+  * **Erros de Conexão:** Verifique 100% que a URL e a porta em `KAFKA_ADVERTISED_LISTENERS` (no serviço Kafka) e `KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS` (no serviço Kafka UI) são idênticas.
